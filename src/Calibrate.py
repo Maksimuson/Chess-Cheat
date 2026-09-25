@@ -2,13 +2,8 @@
 Calibration: shows the full-screen screenshot, you select the chess board with the mouse.
 The coordinates are saved to board_config.json (read by board_reader.py).
 
-    python calibrate.py [path_to_screenshot]
-
 Select the board exactly along the outer edges of the squares (no frame, no coordinates)
 and press ENTER. Then check the 8x8 grid on the preview: Y = accept, any other key = redo.
-
-NOTE: this file is ASCII-only on purpose, so it works no matter which encoding
-your editor saves it in.
 """
 import os
 import sys

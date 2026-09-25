@@ -5,6 +5,11 @@ VisualStudioVersion = 17.2.32602.215
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chess cheat", "Chess cheat.vcxproj", "{9E06BBD2-3AE9-492D-8FAA-0E34D688D3BD}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Элементы решения", "Элементы решения", "{75CF3D4D-8976-44BC-816C-DD012535E793}"
+	ProjectSection(SolutionItems) = preProject
+		src\templates.npz = src\templates.npz
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64

@@ -1,5 +1,3 @@
-// NOTE: keep this file ASCII-only (no Cyrillic in comments or strings) so that
-// MSVC does not mangle it depending on the source file encoding.
 #include <windows.h>
 #include <shlobj.h>
 #include <gdiplus.h>
@@ -21,14 +19,6 @@ static bool g_hovered = false;
 static bool g_busy = false;   // Python is working, ignore clicks
 
 static const UINT WM_BOARD_READY = WM_APP + 1;
-
-// ---------------------------------------------------------------------------
-// Paths. Project folder = <Desktop>\Chess cheat  (works with OneDrive desktop
-// and Cyrillic folder names, because Windows returns the real desktop path).
-//   <root>\screenshots\shot.bmp   - the screenshot
-//   <root>\src\board_reader.py    - the recognizer
-// If your folders are different, just change InitPaths().
-// ---------------------------------------------------------------------------
 static std::wstring g_root;
 static std::wstring g_shotPath;
 static std::wstring g_scriptPath;
@@ -41,7 +31,7 @@ static void InitPaths()
         g_root = std::wstring(desktop) + L"\\Chess cheat";
         CoTaskMemFree(desktop);
     }
-    CreateDirectoryW((g_root + L"\\screenshots").c_str(), NULL); // ok if it already exists
+    CreateDirectoryW((g_root + L"\\screenshots").c_str(), NULL);
     g_shotPath = g_root + L"\\screenshots\\shot.bmp";
     g_scriptPath = g_root + L"\\src\\board_reader.py";
 }
@@ -133,7 +123,7 @@ static std::string RunPython(const std::wstring& script, const std::wstring& sho
     si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
 
     PROCESS_INFORMATION pi = {};
-    std::wstring cmd = L"python \"" + script + L"\" \"" + shot + L"\"";
+    std::wstring cmd = L"python \"" + script + L"\" move w \"" + shot + L"\"";
     std::wstring workDir = script.substr(0, script.find_last_of(L'\\'));
 
     BOOL started = CreateProcessW(NULL, &cmd[0], NULL, NULL, TRUE, CREATE_NO_WINDOW,
@@ -147,7 +137,7 @@ static std::string RunPython(const std::wstring& script, const std::wstring& sho
     }
 
     std::string out;
-    char buf[4096];
+    char buf[4096]; // Allocate a 4 KB buffer to read data in chunks from the channel
     DWORD n = 0;
     while (ReadFile(hRead, buf, sizeof(buf), &n, NULL) && n > 0)
         out.append(buf, n);
@@ -172,6 +162,8 @@ static DWORD WINAPI Worker(LPVOID param)
     return 0;
 }
 
+
+// Declaration of a static function, `Utf8ToWide`, which takes a UTF-8 string and returns a UTF-16 wide string
 static std::wstring Utf8ToWide(const std::string& s)
 {
     if (s.empty())
@@ -182,18 +174,18 @@ static std::wstring Utf8ToWide(const std::string& s)
     return w;
 }
 
+// ---------------------------------------------------------------------------
 // Called on the UI thread when Python has finished.
-// `result` is the text printed by board_reader.py: 8 lines like "[0, 0, -4, ...]"
+// `result` is the text printed by board_reader.py.
+// ---------------------------------------------------------------------------
 static void OnBoardReady(HWND hwnd, const std::string& result)
 {
-    // ---- NEXT STEP GOES HERE: parse `result` into an int board[8][8] ----
-
+    // Display a pop-up window with the title “Board,” the text “result” converted from UTF-8 to UTF-16, an OK button, and the window displayed on top of all other windows
     MessageBeep(result.compare(0, 5, "ERROR") == 0 ? MB_ICONERROR : MB_OK);
     MessageBoxW(hwnd, Utf8ToWide(result).c_str(), L"Board",
         MB_OK | MB_TOPMOST | MB_SETFOREGROUND);
 }
 
-// ---------------------------------------------------------------------------
 
 static void DrawButton(HDC hdc, bool hovered, bool busy)
 {
@@ -219,7 +211,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 {
     switch (msg)
     {
-    case WM_PAINT:
+    case WM_PAINT: // Handling the WM_PAINT message to redraw the window's contents
     {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
@@ -241,7 +233,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         return 0;
     }
 
-    case WM_LBUTTONUP:
+    case WM_LBUTTONUP: // Handle the left-mouse-button release event (click)
     {
         if (g_busy)
             return 0;
@@ -269,7 +261,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         return 0;
     }
 
-    case WM_BOARD_READY:
+    case WM_BOARD_READY:  // Handle the user notification that the results are ready from the background thread
     {
         std::string* result = (std::string*)lParam;
         g_busy = false;
@@ -279,11 +271,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         return 0;
     }
 
-    case WM_RBUTTONUP:
-        DestroyWindow(hwnd); // right click closes the button
+    case WM_RBUTTONUP:  // Handling the right-click event
+        DestroyWindow(hwnd); // right click destroy the button
         return 0;
 
-    case WM_MOUSEMOVE:
+    case WM_MOUSEMOVE:  // Handling mouse cursor movement over the window
     {
         if (!g_hovered)
         {
@@ -298,7 +290,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         return 0;
     }
 
-    case WM_MOUSELEAVE:
+    case WM_MOUSELEAVE:  // Handle the event that occurs when the mouse cursor moves outside the window
         g_hovered = false;
         InvalidateRect(hwnd, NULL, FALSE);
         return 0;

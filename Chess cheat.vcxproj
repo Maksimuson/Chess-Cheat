@@ -133,6 +133,12 @@
   <ItemGroup>
     <ClInclude Include="src\screenshot.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="src\board_config.json" />
+    <None Include="src\board_reader.py" />
+    <None Include="src\Calibrate.py" />
+    <None Include="src\templates.npz" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

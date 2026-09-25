@@ -30,4 +30,18 @@
       <Filter>Исходные файлы\src</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="src\board_config.json">
+      <Filter>Исходные файлы\src</Filter>
+    </None>
+    <None Include="src\board_reader.py">
+      <Filter>Исходные файлы\src</Filter>
+    </None>
+    <None Include="src\Calibrate.py">
+      <Filter>Исходные файлы\src</Filter>
+    </None>
+    <None Include="src\templates.npz">
+      <Filter>Исходные файлы\src</Filter>
+    </None>
+  </ItemGroup>
 </Project>

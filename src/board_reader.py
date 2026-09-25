@@ -1,8 +1,4 @@
 """
-Local chess board recognition from a full-screen screenshot (no Gemini, no internet).
-
-NOTE: this file is ASCII-only on purpose, so it works no matter which encoding
-your editor saves it in.
 
 One-time setup:
   1) Open a game at the STARTING position and press the overlay button (creates shot.bmp).
@@ -12,12 +8,11 @@ One-time setup:
 After that:  python board_reader.py   (reads shot.bmp)  or from code:
   from board_reader import read_board
   matrix = read_board(path)
-
-Templates depend on the piece theme; if you change site/theme, repeat steps 1-3.
 """
 import os
 import sys
 import json
+import subprocess
 import cv2
 import numpy as np
 
@@ -26,10 +21,19 @@ CONFIG_FILE = os.path.join(HERE, "board_config.json")   # created by calibrate.p
 TEMPLATE_FILE = os.path.join(HERE, "templates.npz")
 # default screenshot: ..\screenshots\shot.bmp (folder "src" next to folder "screenshots")
 DEFAULT_SHOT = os.path.join(HERE, "..", "screenshots", "shot.bmp")
+# default engine location: ..\engine\stockfish.exe (put the downloaded exe there)
+DEFAULT_ENGINE = os.path.join(HERE, "..", "engine", "stockfish.exe")
 
 
 def load_config():
-    cfg = {"box": None, "my_color": "auto", "start_white_at_bottom": True}
+    cfg = {
+        "box": None,
+        "my_color": "auto",
+        "start_white_at_bottom": True,
+        "engine_path": DEFAULT_ENGINE,
+        "turn": "w",          # whose move it is; override per call, see CLI below
+        "movetime_ms": 1000,  # how long Stockfish thinks, in milliseconds
+    }
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, encoding="utf-8") as f:
             cfg.update(json.load(f))
@@ -40,6 +44,9 @@ _cfg = load_config()
 BOARD_BOX = tuple(_cfg["box"]) if _cfg["box"] else None  # (left, top, right, bottom) in pixels
 MY_COLOR = _cfg["my_color"]                               # "white" / "black" / "auto"
 START_WHITE_AT_BOTTOM = _cfg["start_white_at_bottom"]     # white at the bottom on the template screenshot?
+ENGINE_PATH = _cfg["engine_path"]
+DEFAULT_TURN = _cfg["turn"]
+MOVETIME_MS = _cfg["movetime_ms"]
 
 SQ = 48                 # square size after normalization
 PIECE_NUM = {"P": 1, "N": 2, "B": 3, "R": 4, "Q": 5, "K": 6}
@@ -199,9 +206,182 @@ def read_board(path):
     return board
 
 
+class RecognitionError(Exception):
+    """Raised when the recognized grid is not a physically possible chess position."""
+
+
+def validate_grid(grid):
+    """Basic sanity check: catches a mismatched piece theme before it reaches the engine.
+
+    A real position has exactly one king per side and a handful of other limits.
+    If templates come from the wrong theme, recognition tends to collapse onto one
+    or two piece types (often the king), which this catches early with a clear
+    message instead of sending garbage to the engine.
+    """
+    counts = {}
+    for row in grid:
+        for key in row:
+            if key:
+                counts[key] = counts.get(key, 0) + 1
+
+    problems = []
+    for color in ("w", "b"):
+        kings = counts.get(color + "K", 0)
+        if kings != 1:
+            problems.append(f"{'white' if color == 'w' else 'black'} kings: {kings} (must be 1)")
+        if counts.get(color + "P", 0) > 8:
+            problems.append(f"{'white' if color == 'w' else 'black'} pawns: {counts.get(color + 'P')} (max 8)")
+
+    if problems:
+        raise RecognitionError(
+            "Board recognition looks wrong (" + "; ".join(problems) + "). "
+            "This usually means the piece templates do not match the current theme - "
+            "recalibrate: open a normal game at the starting position with this theme, "
+            "then run 'python board_reader.py templates' again."
+        )
+
+
+def board_to_fen(grid, turn, start_white_at_bottom):
+    """Piece-placement FEN from an absolute w/b grid (as returned by read_grid).
+
+    Castling rights, en passant, and move counters cannot be known from a single
+    screenshot, so they are filled with permissive defaults (full castling rights
+    assumed, no en passant). This is fine for "what is the best move right now"
+    analysis; it can misjudge a rare position where castling is no longer legal.
+    """
+    pos = {}
+    for r in range(8):
+        for c in range(8):
+            key = grid[r][c]
+            if key is None:
+                continue
+            color, piece = key[0], key[1]
+            if start_white_at_bottom:
+                rank, file_idx = 8 - r, c
+            else:
+                rank, file_idx = r + 1, 7 - c
+            pos[(rank, file_idx)] = piece if color == "w" else piece.lower()
+
+    rows = []
+    for rank in range(8, 0, -1):
+        row, empty = "", 0
+        for file_idx in range(8):
+            letter = pos.get((rank, file_idx))
+            if letter is None:
+                empty += 1
+                continue
+            if empty:
+                row += str(empty)
+                empty = 0
+            row += letter
+        if empty:
+            row += str(empty)
+        rows.append(row)
+
+    return f"{'/'.join(rows)} {turn} KQkq - 0 1"
+
+
+class Engine:
+    """Thin UCI wrapper around a Stockfish (or any UCI engine) process."""
+
+    def __init__(self, path):
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                f"Engine not found: {path}\n"
+                "Download Stockfish from https://stockfishchess.org/download/ "
+                "and set its path in board_config.json (\"engine_path\") or place "
+                "it at ..\\engine\\stockfish.exe"
+            )
+        self.proc = subprocess.Popen(
+            [path], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            text=True, bufsize=1,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+        self._send("uci")
+        self._wait_for("uciok")
+        self._send("isready")
+        self._wait_for("readyok")
+
+    def _send(self, cmd):
+        self.proc.stdin.write(cmd + "\n")
+        self.proc.stdin.flush()
+
+    def _wait_for(self, token, timeout_lines=10000):
+        for _ in range(timeout_lines):
+            line = self.proc.stdout.readline()
+            if not line:
+                break
+            if token in line:
+                return line
+        code = self.proc.poll()
+        raise RuntimeError(
+            f"Engine did not respond with '{token}' (process exit code: {code}). "
+            "This usually means the FEN sent to it was not a legal position."
+        )
+
+    def best_move(self, fen, movetime_ms=1000):
+        self._send(f"position fen {fen}")
+        self._send(f"go movetime {movetime_ms}")
+        line = self._wait_for("bestmove")
+        move = line.split()[1]
+        if move == "(none)":
+            return None  # checkmate or stalemate in this position
+        return move
+
+    def close(self):
+        try:
+            self._send("quit")
+        except Exception:
+            pass
+        self.proc.terminate()
+
+
+def suggest_move(shot_path, turn, engine_path=None, movetime_ms=None):
+    """Reads the board and asks the engine for the best move. Returns (board, fen, move)."""
+    grid = read_grid(shot_path)
+    validate_grid(grid)  # fail fast with a clear message instead of a bad FEN reaching the engine
+    fen = board_to_fen(grid, turn, START_WHITE_AT_BOTTOM)
+    engine = Engine(engine_path or ENGINE_PATH)
+    try:
+        move = engine.best_move(fen, movetime_ms or MOVETIME_MS)
+    finally:
+        engine.close()
+
+    me = detect_my_color(grid) if MY_COLOR == "auto" else MY_COLOR[0]
+    board = [
+        [0 if key is None else (PIECE_NUM[key[1]] if key[0] == me else -PIECE_NUM[key[1]])
+         for key in row]
+        for row in grid
+    ]
+    return board, fen, move
+
+
 if __name__ == "__main__":
     if len(sys.argv) >= 2 and sys.argv[1] == "templates":
         make_templates(sys.argv[2] if len(sys.argv) >= 3 else DEFAULT_SHOT)
+
+    elif len(sys.argv) >= 2 and sys.argv[1] == "move":
+        # python board_reader.py move [w|b] [shot_path]
+        turn = DEFAULT_TURN
+        shot = DEFAULT_SHOT
+        rest = sys.argv[2:]
+        if rest and rest[0] in ("w", "b"):
+            turn, rest = rest[0], rest[1:]
+        if rest:
+            shot = rest[0]
+
+        try:
+            board, fen, move = suggest_move(shot, turn)
+        except (RecognitionError, FileNotFoundError, RuntimeError) as e:
+            # a clean one-line message instead of a full traceback in the C++ message box
+            print(f"ERROR: {e}")
+            sys.exit(1)
+
+        for line in board:
+            print(line)
+        print(f"FEN: {fen}")
+        print(f"Best move: {move}" if move else "Best move: none (checkmate/stalemate)")
+
     else:
         shot = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_SHOT
         for line in read_board(shot):
