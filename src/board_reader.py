@@ -1,5 +1,4 @@
 """
-
 One-time setup:
   1) Open a game at the STARTING position and press the overlay button (creates shot.bmp).
   2) python calibrate.py               - select the board with the mouse
@@ -242,13 +241,15 @@ def validate_grid(grid):
 
 
 def board_to_fen(grid, turn, start_white_at_bottom):
-    """Piece-placement FEN from an absolute w/b grid (as returned by read_grid).
+    """
+    Piece-placement FEN from an absolute w/b grid (as returned by read_grid).
 
     Castling rights, en passant, and move counters cannot be known from a single
     screenshot, so they are filled with permissive defaults (full castling rights
     assumed, no en passant). This is fine for "what is the best move right now"
     analysis; it can misjudge a rare position where castling is no longer legal.
     """
+   
     pos = {}
     for r in range(8):
         for c in range(8):
@@ -353,7 +354,7 @@ def suggest_move(shot_path, turn, engine_path=None, movetime_ms=None):
          for key in row]
         for row in grid
     ]
-    return board, fen, move
+    return board, move
 
 
 if __name__ == "__main__":
@@ -371,15 +372,12 @@ if __name__ == "__main__":
             shot = rest[0]
 
         try:
-            board, fen, move = suggest_move(shot, turn)
+            board, move = suggest_move(shot, turn)
         except (RecognitionError, FileNotFoundError, RuntimeError) as e:
             # a clean one-line message instead of a full traceback in the C++ message box
             print(f"ERROR: {e}")
             sys.exit(1)
 
-        for line in board:
-            print(line)
-        print(f"FEN: {fen}")
         print(f"Best move: {move}" if move else "Best move: none (checkmate/stalemate)")
 
     else:

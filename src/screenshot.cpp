@@ -13,7 +13,7 @@
 
 using namespace Gdiplus;
 
-static const int BTN_W = 60;
+static const int BTN_W = 120;
 static const int BTN_H = 60;
 static bool g_hovered = false;
 static bool g_busy = false;   // Python is working, ignore clicks
@@ -178,33 +178,101 @@ static std::wstring Utf8ToWide(const std::string& s)
 // Called on the UI thread when Python has finished.
 // `result` is the text printed by board_reader.py.
 // ---------------------------------------------------------------------------
+static HWND g_hResult = NULL;   // окно с результатом
+static HWND g_hEdit = NULL;   // текстовое поле внутри него
+static HFONT g_hFont = NULL;
+
+static std::wstring NormalizeNewlines(const std::wstring& s)
+{
+    std::wstring r;
+    for (size_t i = 0; i < s.size(); ++i)
+    {
+        if (s[i] == L'\n' && (i == 0 || s[i - 1] != L'\r'))
+            r += L'\r';
+        r += s[i];
+    }
+    return r;
+}
+
+static LRESULT CALLBACK ResultProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg)
+    {
+    case WM_CREATE:
+        g_hEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+            WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
+            0, 0, 0, 0, hwnd, NULL, GetModuleHandleW(NULL), NULL);
+        g_hFont = CreateFontW(-18, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET,
+            0, 0, 0, FIXED_PITCH | FF_MODERN, L"Consolas");   // моноширинный, чтобы матрица не Ђплылаї
+        SendMessageW(g_hEdit, WM_SETFONT, (WPARAM)g_hFont, TRUE);
+        return 0;
+
+    case WM_SIZE:
+        MoveWindow(g_hEdit, 0, 0, LOWORD(lParam), HIWORD(lParam), TRUE);
+        return 0;
+
+    case WM_CLOSE:                 // крестик только пр€чет окно, а не уничтожает
+        ShowWindow(hwnd, SW_HIDE);
+        return 0;
+
+    case WM_DESTROY:
+        DeleteObject(g_hFont);
+        g_hFont = NULL; g_hEdit = NULL; g_hResult = NULL;
+        return 0;                  // PostQuitMessage тут Ќ≈ нужен
+    }
+    return DefWindowProcW(hwnd, msg, wParam, lParam);
+}
+
 static void OnBoardReady(HWND hwnd, const std::string& result)
 {
-    // Display a pop-up window with the title УBoard,Ф the text УresultФ converted from UTF-8 to UTF-16, an OK button, and the window displayed on top of all other windows
     MessageBeep(result.compare(0, 5, "ERROR") == 0 ? MB_ICONERROR : MB_OK);
-    MessageBoxW(hwnd, Utf8ToWide(result).c_str(), L"Board",
-        MB_OK | MB_TOPMOST | MB_SETFOREGROUND);
+
+    if (!g_hResult)
+    {
+        g_hResult = CreateWindowExW(WS_EX_TOPMOST, L"ResultWindowClass", L"Board",
+            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME,
+            160, 20, 420, 360,          // x=160, чтобы не перекрывать кнопку
+            NULL, NULL, GetModuleHandleW(NULL), NULL);   // владельца нет, кнопка не блокируетс€
+    }
+    SetWindowTextW(g_hEdit, NormalizeNewlines(Utf8ToWide(result)).c_str());
+    ShowWindow(g_hResult, SW_SHOWNOACTIVATE);   // показать, не забира€ фокус
 }
 
 
-static void DrawButton(HDC hdc, bool hovered, bool busy)
+static void DrawButton(HDC hdc, bool hovered, bool busy, float spinAngle = 0.f)
 {
-    Graphics graphics(hdc);
-    graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+    Graphics g(hdc);
+    g.SetSmoothingMode(SmoothingModeAntiAlias);   
 
-    Color bgColor = busy ? Color(230, 20, 80, 150)
-        : (hovered ? Color(230, 60, 60, 60) : Color(200, 30, 30, 30));
-    SolidBrush brush(bgColor);
-    graphics.FillEllipse(&brush, 2, 2, BTN_W - 4, BTN_H - 4);
+    const int w = BTN_W, h = BTN_H;
+    const int cx = w / 2, cy = h / 2;
+    const int border = 3;                         
 
-    Pen pen(Color(255, 255, 255, 255), 2);
-    graphics.DrawEllipse(&pen, 2, 2, BTN_W - 4, BTN_H - 4);
+    const Color dark(255, 34, 87, 45);            
+    Color fill = busy ? Color(255, 137, 184, 108)
+        : hovered ? Color(255, 184, 224, 152)
+        : Color(255, 163, 209, 128);  
 
-    // Simple camera icon: body + lens
-    SolidBrush iconBrush(Color(255, 255, 255, 255));
-    graphics.FillRectangle(&iconBrush, BTN_W / 2 - 14, BTN_H / 2 - 8, 28, 18);
-    SolidBrush lensBrush(Color(255, 30, 30, 30));
-    graphics.FillEllipse(&lensBrush, BTN_W / 2 - 6, BTN_H / 2 - 4, 12, 12);
+    SolidBrush darkBrush(dark);
+    g.FillRectangle(&darkBrush, 0, 0, w, h);
+    SolidBrush fillBrush(fill);
+    g.FillRectangle(&fillBrush, border, border, w - 2 * border, h - 2 * border);
+
+    g.FillRectangle(&darkBrush, cx - 6, cy - 13, 12, 6);
+    g.FillRectangle(&darkBrush, cx - 15, cy - 8, 30, 20);
+
+    SolidBrush lensBrush(fill);
+    g.FillEllipse(&lensBrush, cx - 7, cy - 5, 14, 14);
+    g.FillEllipse(&darkBrush, cx - 3, cy - 1, 6, 6);
+
+    g.FillRectangle(&lensBrush, cx + 9, cy - 5, 4, 3);
+
+    if (busy) {
+        Pen arc(dark, 2.f);
+        arc.SetStartCap(LineCapRound);
+        arc.SetEndCap(LineCapRound);
+        g.DrawArc(&arc, RectF(cx - 4.5f, cy + 2.f - 4.5f, 9.f, 9.f), spinAngle, 100.f);
+    }
 }
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -240,6 +308,8 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         g_busy = true;
 
         // Hide the button so it does not appear in the screenshot
+        bool resultWasVisible = g_hResult && IsWindowVisible(g_hResult);
+        if (resultWasVisible) ShowWindow(g_hResult, SW_HIDE);
         ShowWindow(hwnd, SW_HIDE);
         Sleep(150);
         bool ok = SaveScreenBmp(g_shotPath.c_str());
@@ -247,6 +317,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 
         if (!ok)
         {
+            if (resultWasVisible) ShowWindow(g_hResult, SW_SHOWNOACTIVATE);
             g_busy = false;
             MessageBeep(MB_ICONERROR);
             return 0;
@@ -290,15 +361,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         return 0;
     }
 
-    case WM_MOUSELEAVE:  // Handle the event that occurs when the mouse cursor moves outside the window
-        g_hovered = false;
-        InvalidateRect(hwnd, NULL, FALSE);
-        return 0;
-
     case WM_DESTROY:
+        if (g_hResult) DestroyWindow(g_hResult);
         PostQuitMessage(0);
         return 0;
-    }
+    }   
     return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
@@ -319,6 +386,13 @@ int RunOverlay()
     wc.lpszClassName = L"OverlayButtonClass";
     wc.hCursor = LoadCursor(NULL, IDC_HAND);
     RegisterClassW(&wc);
+    WNDCLASSW wc2 = {};
+    wc2.lpfnWndProc = ResultProc;
+    wc2.hInstance = hInstance;
+    wc2.lpszClassName = L"ResultWindowClass";
+    wc2.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc2.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    RegisterClassW(&wc2);
 
     // Always on top, no taskbar entry, black pixels are transparent
     HWND hwnd = CreateWindowExW(
