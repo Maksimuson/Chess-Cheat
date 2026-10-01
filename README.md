@@ -13,8 +13,10 @@ with no neural network, then asks Stockfish what to play.
 ![OpenCV](https://img.shields.io/badge/vision-OpenCV-5C3EE8?logo=opencv&logoColor=white)
 ![Engine](https://img.shields.io/badge/engine-Stockfish-4B8B3B)
 
-<!-- Replace with your own demo: record a short screen capture and convert it to a GIF -->
-<img src="docs/demo.gif" alt="Demo" width="720">
+
+
+https://github.com/user-attachments/assets/e7840f55-637e-4b8d-a6d3-bc34ff32c4f0
+
 
 </div>
 
