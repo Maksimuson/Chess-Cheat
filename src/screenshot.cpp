@@ -123,7 +123,7 @@ static std::string RunPython(const std::wstring& script, const std::wstring& sho
     si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
 
     PROCESS_INFORMATION pi = {};
-    std::wstring cmd = L"python \"" + script + L"\" move w \"" + shot + L"\"";
+    std::wstring cmd = L"python \"" + script + L"\" move \"" + shot + L"\"";
     std::wstring workDir = script.substr(0, script.find_last_of(L'\\'));
 
     BOOL started = CreateProcessW(NULL, &cmd[0], NULL, NULL, TRUE, CREATE_NO_WINDOW,
@@ -178,8 +178,8 @@ static std::wstring Utf8ToWide(const std::string& s)
 // Called on the UI thread when Python has finished.
 // `result` is the text printed by board_reader.py.
 // ---------------------------------------------------------------------------
-static HWND g_hResult = NULL;   // окно с результатом
-static HWND g_hEdit = NULL;   // текстовое поле внутри него
+static HWND g_hResult = NULL;   // пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+static HWND g_hEdit = NULL;   // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ
 static HFONT g_hFont = NULL;
 
 static std::wstring NormalizeNewlines(const std::wstring& s)
@@ -203,7 +203,7 @@ static LRESULT CALLBACK ResultProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
             0, 0, 0, 0, hwnd, NULL, GetModuleHandleW(NULL), NULL);
         g_hFont = CreateFontW(-18, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET,
-            0, 0, 0, FIXED_PITCH | FF_MODERN, L"Consolas");   // моноширинный, чтобы матрица не «плыла»
+            0, 0, 0, FIXED_PITCH | FF_MODERN, L"Consolas");   // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
         SendMessageW(g_hEdit, WM_SETFONT, (WPARAM)g_hFont, TRUE);
         return 0;
 
@@ -211,14 +211,14 @@ static LRESULT CALLBACK ResultProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
         MoveWindow(g_hEdit, 0, 0, LOWORD(lParam), HIWORD(lParam), TRUE);
         return 0;
 
-    case WM_CLOSE:                 // крестик только прячет окно, а не уничтожает
+    case WM_CLOSE:                 // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ, пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         ShowWindow(hwnd, SW_HIDE);
         return 0;
 
     case WM_DESTROY:
         DeleteObject(g_hFont);
         g_hFont = NULL; g_hEdit = NULL; g_hResult = NULL;
-        return 0;                  // PostQuitMessage тут НЕ нужен
+        return 0;                  // PostQuitMessage пїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
     }
     return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
@@ -231,11 +231,11 @@ static void OnBoardReady(HWND hwnd, const std::string& result)
     {
         g_hResult = CreateWindowExW(WS_EX_TOPMOST, L"ResultWindowClass", L"Board",
             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME,
-            160, 20, 420, 360,          // x=160, чтобы не перекрывать кнопку
-            NULL, NULL, GetModuleHandleW(NULL), NULL);   // владельца нет, кнопка не блокируется
+            160, 20, 420, 360,          // x=160, пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
+            NULL, NULL, GetModuleHandleW(NULL), NULL);   // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
     }
     SetWindowTextW(g_hEdit, NormalizeNewlines(Utf8ToWide(result)).c_str());
-    ShowWindow(g_hResult, SW_SHOWNOACTIVATE);   // показать, не забирая фокус
+    ShowWindow(g_hResult, SW_SHOWNOACTIVATE);   // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
 }
 
 

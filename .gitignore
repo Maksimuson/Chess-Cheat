@@ -1,3 +1,4 @@
+# --- Visual Studio / C++ build output ---
 .vs/
 Debug/
 Release/
@@ -15,23 +16,33 @@ x86/
 *.iobj
 *.ipdb
 *.ipch
+*.pch
 *.sdf
 *.opensdf
 *.VC.db
 *.VC.VC.opendb
-Chess cheat.vcxproj.user
+*.vcxproj.user
+*.suo
+*.user
 
+# --- Python ---
 __pycache__/
 *.pyc
 *.pyo
 .venv/
 venv/
 
+# --- Local, machine-specific files (created by app.py / board_reader.py) ---
 screenshots/*.bmp
 screenshots/*.png
-
-
 src/board_config.json
 src/templates.npz
 
+# --- Stockfish and other engine binaries (download separately) ---
 engine/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

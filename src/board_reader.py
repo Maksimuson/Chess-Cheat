@@ -341,6 +341,8 @@ def suggest_move(shot_path, turn, engine_path=None, movetime_ms=None):
     """Reads the board and asks the engine for the best move. Returns (board, fen, move)."""
     grid = read_grid(shot_path)
     validate_grid(grid)  # fail fast with a clear message instead of a bad FEN reaching the engine
+    if turn == "me":
+        turn = detect_my_color(grid) if MY_COLOR == "auto" else MY_COLOR[0]
     fen = board_to_fen(grid, turn, START_WHITE_AT_BOTTOM)
     engine = Engine(engine_path or ENGINE_PATH)
     try:
