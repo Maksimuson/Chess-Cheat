@@ -1,12 +1,3 @@
-"""
-Chess board reader - setup window.
-Put it next to board_reader.py (the "src" folder).
-
-Requirements:  pip install pillow opencv-python numpy
-Run:           python app.py
-
-Workflow: 1) screenshot  2) calibrate  3) build templates  ->  Launch overlay (C++ button) and play.
-"""
 import os
 import sys
 import json
